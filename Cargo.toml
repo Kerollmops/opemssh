@@ -1,0 +1,11 @@
+[package]
+name = "opemssh"
+version = "0.1.0"
+authors = ["Kerollmops <renault.cle@gmail.com>",
+           "Samir Dahan <sdhan@student.42.fr>"]
+
+[dependencies]
+yasna = "0.1"
+base64 = "0.6"
+num = "0.1"
+# byteorder = "1.1"
