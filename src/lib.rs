@@ -8,7 +8,6 @@ const SSH_RSA_TEXT: &str = "ssh-rsa";
 
 use std::io::{Read, BufRead};
 use std::io::{self, BufReader};
-use std::u8;
 use num::bigint::{BigInt, Sign};
 use base64::{decode, encode, DecodeError};
 use yasna::{parse_der, ASN1Error};
@@ -92,9 +91,9 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, Error> {
     let (sign, mut bytes) = public_der.exponent.to_bytes_be();
     // add a byte to toggle the sign bit
     if bytes.len() < exp_bits_size as usize {
-        let sign = if sign == Sign::Minus { u8::MAX } else { 0 };
-        bytes.insert(0, sign);
+        bytes.insert(0, 0);
     }
+    bytes[0] |= if sign == Sign::Minus { 0b1000_0000 } else { 0 };
     // write the exponent itself (with sign bit)
     openssh_key.extend_from_slice(&bytes);
 
@@ -105,9 +104,9 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, Error> {
     let (sign, mut bytes) = public_der.modulus.to_bytes_be();
     // add a byte to toggle the sign bit
     if bytes.len() < mod_bits_size as usize {
-        let sign = if sign == Sign::Minus { u8::MAX } else { 0 };
-        bytes.insert(0, sign);
+        bytes.insert(0, 0);
     }
+    bytes[0] |= if sign == Sign::Minus { 0b1000_0000 } else { 0 };
     // write the modulus itself (with sign bit)
     openssh_key.extend_from_slice(&bytes);
 
