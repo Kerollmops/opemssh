@@ -10,11 +10,19 @@ use std::io::{Read, BufRead};
 use std::io::{self, BufReader};
 use std::u8;
 use num::bigint::{BigInt, Sign};
-use base64::{decode, encode};
-use yasna::parse_der;
+use base64::{decode, encode, DecodeError};
+use yasna::{parse_der, ASN1Error};
 use yasna::models::ObjectIdentifier;
 use byteorder::BigEndian;
 use byteorder::WriteBytesExt;
+
+#[derive(Debug)]
+pub enum Error {
+    IoError(io::Error),
+    DecodeError(DecodeError),
+    ASN1Error(ASN1Error),
+    InvalidSshaRsa,
+}
 
 #[derive(Debug)]
 struct PublicDer {
@@ -24,21 +32,21 @@ struct PublicDer {
 }
 
 // TODO: check header name
-pub fn pem_to_der<R: Read>(pem: &mut R) -> io::Result<Vec<u8>> {
+pub fn pem_to_der<R: Read>(pem: &mut R) -> Result<Vec<u8>, Error> {
     let buff = BufReader::new(pem);
     let mut pem = String::new();
 
     for line in buff.lines() {
-        let line = line?;
+        let line = line.map_err(Error::IoError)?;
         if !line.starts_with('-') {
             pem.extend(line.chars());
         }
     }
 
-    Ok(decode(&pem).unwrap())
+    Ok(decode(&pem).map_err(Error::DecodeError)?)
 }
 
-pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
+pub fn der_to_openssh(der: &[u8]) -> Result<String, Error> {
     let public_der = parse_der(der, |reader| {
         reader.read_sequence(|reader| {
             let oid = reader.next().read_sequence(|reader| {
@@ -62,11 +70,11 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
                 modulus: n,
             })
         })
-    }).expect("Ooops");
+    }).map_err(Error::ASN1Error)?;
 
     let iod = public_der.object_identifier.components().as_slice();
     if iod != RSA_ENCRYPTION {
-        panic!("Ooops 2")
+        return Err(Error::InvalidSshaRsa);
     }
 
     // TODO: compute capacity
@@ -74,13 +82,13 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
 
     // write the size of the 'ssh-rsa' text
     let ssh_rsa_text_len = SSH_RSA_TEXT.len() as u32;
-    openssh_key.write_u32::<BigEndian>(ssh_rsa_text_len).unwrap(); // TODO: don't unwrap !
+    openssh_key.write_u32::<BigEndian>(ssh_rsa_text_len).map_err(Error::IoError)?;
     // write the 'ssh-rsa' text itself
     openssh_key.extend_from_slice(SSH_RSA_TEXT.as_bytes());
 
     // write the size of the exponent
     let exp_bits_size = (public_der.exponent.bits() / 8 + 1) as u32;
-    openssh_key.write_u32::<BigEndian>(exp_bits_size).unwrap();
+    openssh_key.write_u32::<BigEndian>(exp_bits_size).map_err(Error::IoError)?;
     let (sign, mut bytes) = public_der.exponent.to_bytes_be();
     // add a byte to toggle the sign bit
     if bytes.len() < exp_bits_size as usize {
@@ -92,7 +100,7 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
 
     // write the size of the modulus
     let mod_bits_size = (public_der.modulus.bits() / 8 + 1) as u32;
-    openssh_key.write_u32::<BigEndian>(mod_bits_size).unwrap();
+    openssh_key.write_u32::<BigEndian>(mod_bits_size).map_err(Error::IoError)?;
 
     let (sign, mut bytes) = public_der.modulus.to_bytes_be();
     // add a byte to toggle the sign bit
@@ -107,10 +115,3 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
     openssh_key.insert_str(0, "ssh-rsa ");
     Ok(openssh_key)
 }
-
-// #[cfg(test)]
-// mod tests {
-//     #[test]
-//     fn it_works() {
-//     }
-// }
