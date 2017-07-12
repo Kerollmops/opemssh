@@ -1,6 +1,6 @@
 [package]
 name = "opemssh"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Kerollmops <renault.cle@gmail.com>",
            "Taslim42 <sdhan@student.42.fr>"]
 description = "Pass a key from the PEM format to the OpenSSH format"
