@@ -3,6 +3,11 @@ name = "opemssh"
 version = "0.1.0"
 authors = ["Kerollmops <renault.cle@gmail.com>",
            "Taslim42 <sdhan@student.42.fr>"]
+description = "Pass a key from the PEM format to the OpenSSH format"
+license-file = "LICENSE"
+documentation = "https://docs.rs/opemssh"
+homepage = "https://github.com/Kerollmops/opemssh"
+repository = "https://github.com/Kerollmops/opemssh"
 
 [dependencies]
 yasna = "0.1"
