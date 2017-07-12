@@ -2,7 +2,7 @@
 name = "opemssh"
 version = "0.1.0"
 authors = ["Kerollmops <renault.cle@gmail.com>",
-           "Samir Dahan <sdhan@student.42.fr>"]
+           "Taslim42 <sdhan@student.42.fr>"]
 
 [dependencies]
 yasna = "0.1"

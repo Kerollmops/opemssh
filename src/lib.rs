@@ -8,7 +8,8 @@ const SSH_RSA_TEXT: &str = "ssh-rsa";
 
 use std::io::{Read, BufRead};
 use std::io::{self, BufReader};
-use num::bigint::BigInt;
+use std::u8;
+use num::bigint::{BigInt, Sign};
 use base64::{decode, encode};
 use yasna::parse_der;
 use yasna::models::ObjectIdentifier;
@@ -68,9 +69,8 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
         panic!("Ooops 2")
     }
 
-    // let exp_len = size_len + 0;
-
-    let mut openssh_key = Vec::with_capacity(10000); // TODO: compute this
+    // TODO: compute capacity
+    let mut openssh_key = Vec::new();
 
     // write the size of the 'ssh-rsa' text
     let ssh_rsa_text_len = SSH_RSA_TEXT.len() as u32;
@@ -79,17 +79,28 @@ pub fn der_to_openssh(der: &[u8]) -> Result<String, ()> {
     openssh_key.extend_from_slice(SSH_RSA_TEXT.as_bytes());
 
     // write the size of the exponent
-    let exp_bits_size = ((public_der.exponent.bits() - 1) / 8 + 1) as u32;
+    let exp_bits_size = (public_der.exponent.bits() / 8 + 1) as u32;
     openssh_key.write_u32::<BigEndian>(exp_bits_size).unwrap();
-    // write the exponent itself
-    let (_, bytes) = public_der.exponent.to_bytes_be();
+    let (sign, mut bytes) = public_der.exponent.to_bytes_be();
+    // add a byte to toggle the sign bit
+    if bytes.len() < exp_bits_size as usize {
+        let sign = if sign == Sign::Minus { u8::MAX } else { 0 };
+        bytes.insert(0, sign);
+    }
+    // write the exponent itself (with sign bit)
     openssh_key.extend_from_slice(&bytes);
 
     // write the size of the modulus
-    let mod_bits_size = ((public_der.modulus.bits() - 1) / 8 + 1) as u32;
+    let mod_bits_size = (public_der.modulus.bits() / 8 + 1) as u32;
     openssh_key.write_u32::<BigEndian>(mod_bits_size).unwrap();
-    // write the modulus itself
-    let (_, bytes) = public_der.modulus.to_bytes_be();
+
+    let (sign, mut bytes) = public_der.modulus.to_bytes_be();
+    // add a byte to toggle the sign bit
+    if bytes.len() < mod_bits_size as usize {
+        let sign = if sign == Sign::Minus { u8::MAX } else { 0 };
+        bytes.insert(0, sign);
+    }
+    // write the modulus itself (with sign bit)
     openssh_key.extend_from_slice(&bytes);
 
     let mut openssh_key = encode(&openssh_key);
